@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "779958514339",
+    "firebase_url": "https://connectvibe-5a547-default-rtdb.firebaseio.com",
+    "project_id": "connectvibe-5a547",
+    "storage_bucket": "connectvibe-5a547.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:779958514339:android:5c88ad4cf75051b90dc516",
+        "android_client_info": {
+          "package_name": "com.connectvibe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdyGpJ4x2NySQeOueNmlgUlk20-9op0Sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

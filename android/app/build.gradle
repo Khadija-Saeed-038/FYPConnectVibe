@@ -1,0 +1,81 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+apply plugin: "com.google.gms.google-services"
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
+
+def enableProguardInReleaseBuilds = false
+
+react {
+    hermesEnabled = true
+    autolinkLibrariesWithApp()
+}
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    compileSdk rootProject.ext.compileSdkVersion
+    namespace "com.connectvibe"
+
+    defaultConfig {
+        applicationId "com.connectvibe"
+        minSdk rootProject.ext.minSdkVersion
+        targetSdk rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('connectvibe-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("connectvibe.apk")
+        }
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.core:core:1.13.0'
+        force 'androidx.core:core-ktx:1.13.0'
+    }
+    exclude group: 'com.android.support', module: 'support-compat'
+    exclude group: 'com.android.support', module: 'support-annotations'
+    exclude group: 'com.android.support', module: 'support-v4'
+    exclude group: 'com.android.support', module: 'appcompat-v7'
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:hermes-android")
+
+    implementation platform('com.google.firebase:firebase-bom:33.6.0')
+    implementation "com.google.firebase:firebase-messaging"
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
+
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+}

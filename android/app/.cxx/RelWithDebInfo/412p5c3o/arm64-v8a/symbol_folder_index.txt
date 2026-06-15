@@ -1,0 +1,1 @@
+/Users/mac/Downloads/ConnectVibe-main/android/app/build/intermediates/cxx/RelWithDebInfo/412p5c3o/obj/arm64-v8a
