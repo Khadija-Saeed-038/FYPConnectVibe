@@ -46,8 +46,7 @@ Follow these steps to clone and run the project:
 
 1. **Clone the Repository:**
    ```bash
-   git clone https://github.com/ZaheerHassan26/ConnectVibe.git
-
+   git clone https://github.com/Khadija-Saeed-038/FYPConnectVibe.git
    cd ConnectVibe
 
 
