@@ -1,0 +1,6 @@
+Django>=5.0,<6.0
+django-jazzmin>=3.0
+djangorestframework>=3.15
+drf-spectacular>=0.27
+vaderSentiment>=3.3.2
+numpy>=1.26
