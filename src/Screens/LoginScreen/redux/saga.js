@@ -1,6 +1,7 @@
 import {all, call, put, takeLatest} from 'redux-saga/effects';
 import {Toast} from 'react-native-toast-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Platform} from 'react-native';
 
 import {FIRESTORE_USERS_COLLECTION} from '../../../Config/firebase';
 import {buildSearchIndexFields} from '../../../Utils/userSearchIndex';
@@ -10,6 +11,7 @@ import {
   cacheEnergyMatchCredentials,
   persistFirebaseAccessToken,
 } from '../../../Utils/energyMatchSession';
+import {persistAndSyncToken} from '../../../Utils/notification';
 
 import {
   loginFailure,
@@ -184,6 +186,14 @@ function* loginApiCall({data, fcmToken}) {
           if (!sync.ok && sync.error !== 'NO_ENERGY_MATCH_TOKEN' && __DEV__) {
             console.warn('[EnergyMatch] profile sync:', sync.error);
           }
+        }
+      }
+      if (fcmToken) {
+        yield call(persistAndSyncToken, fcmToken, Platform.OS);
+      } else {
+        const stored = yield call([AsyncStorage, 'getItem'], 'FCMToken');
+        if (stored) {
+          yield call(persistAndSyncToken, stored, Platform.OS);
         }
       }
     }

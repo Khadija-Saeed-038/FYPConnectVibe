@@ -7,4 +7,8 @@ function navigate(route, param) {
     _navigator?.navigate(route, param)
 }
 
-export default { setTopLevelNavigator, navigate }
+function getCurrentRoute() {
+    return _navigator?.getCurrentRoute?.()
+}
+
+export default { setTopLevelNavigator, navigate, getCurrentRoute }

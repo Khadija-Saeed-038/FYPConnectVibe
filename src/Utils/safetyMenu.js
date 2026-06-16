@@ -57,39 +57,62 @@ export function showChatSafetyMenu({onReport, onBlock}) {
   }
 }
 
-/** Group chat header: Report, Block, Rename (Android uses a two-step alert to stay within button limits). */
-export function showGroupChatMenu({onReport, onBlock, onRename}) {
+/** Group chat header: Report, Block, optional Rename (admin), optional Leave. */
+export function showGroupChatMenu({onReport, onBlock, onRename, onLeave}) {
+  const options = ['Report', 'Block'];
+  const handlers = [onReport, onBlock];
+
+  if (onRename) {
+    options.push('Rename group');
+    handlers.push(onRename);
+  }
+  if (onLeave) {
+    options.push('Leave group');
+    handlers.push(onLeave);
+  }
+  options.push('Cancel');
+  const cancelIndex = options.length - 1;
+  const leaveIndex = onLeave ? options.indexOf('Leave group') : -1;
+
   if (Platform.OS === 'ios') {
-    const options = ['Report', 'Block', 'Rename group', 'Cancel'];
     ActionSheetIOS.showActionSheetWithOptions(
       {
         options,
-        cancelButtonIndex: 3,
-        destructiveButtonIndex: 1,
+        cancelButtonIndex: cancelIndex,
+        destructiveButtonIndex: leaveIndex >= 0 ? leaveIndex : 1,
       },
       index => {
-        if (index === 0) {
-          onReport();
-        } else if (index === 1) {
-          onBlock();
-        } else if (index === 2) {
-          onRename();
+        if (index >= 0 && index < handlers.length) {
+          handlers[index]();
         }
       },
     );
   } else {
+    const moderationButtons = [
+      {text: 'Report', onPress: onReport},
+      {text: 'Block', onPress: onBlock, style: 'destructive'},
+      {text: 'Cancel', style: 'cancel'},
+    ];
+    const actionButtons = [{text: 'Cancel', style: 'cancel'}];
+    if (onRename) {
+      actionButtons.unshift({text: 'Rename group', onPress: onRename});
+    }
+    if (onLeave) {
+      actionButtons.unshift({
+        text: 'Leave group',
+        onPress: onLeave,
+        style: 'destructive',
+      });
+    }
+
     Alert.alert('Group', 'Choose an action', [
       {
         text: 'Moderation',
         onPress: () => {
-          Alert.alert('Moderation', undefined, [
-            {text: 'Report', onPress: onReport},
-            {text: 'Block', onPress: onBlock, style: 'destructive'},
-            {text: 'Cancel', style: 'cancel'},
-          ]);
+          Alert.alert('Moderation', undefined, moderationButtons);
         },
       },
-      {text: 'Rename group', onPress: onRename},
+      ...actionButtons.filter(b => b.text !== 'Cancel'),
       {text: 'Cancel', style: 'cancel'},
     ]);
   }

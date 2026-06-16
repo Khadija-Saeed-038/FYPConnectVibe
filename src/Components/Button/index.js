@@ -26,7 +26,7 @@ const Button = ({
         {backgroundColor: buttonColor, borderColor: buttonColor},
         containerStyle,
       ]}
-      disabled={disabled}>
+      disabled={disabled || loading}>
       {loading ? (
         <ActivityIndicator color={textColor} />
       ) : (

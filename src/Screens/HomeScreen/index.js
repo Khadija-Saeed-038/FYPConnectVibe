@@ -497,7 +497,8 @@ const Home = ({ userDetail, navigation, theme }) => {
         <FlatList
           data={List}
           numColumns={1}
-          style={{ width: '100%' }}
+          style={{width: '100%', flex: 1}}
+          contentContainerStyle={{paddingBottom: 16}}
           noIndent={true}
           keyExtractor={item => item?.timeStamp}
           ListEmptyComponent={() => (
@@ -619,7 +620,8 @@ const Home = ({ userDetail, navigation, theme }) => {
         <FlatList
           data={groupSorted(sortByDate(group))}
           numColumns={1}
-          style={{ width: '100%' }}
+          style={{width: '100%', flex: 1}}
+          contentContainerStyle={{paddingBottom: 16}}
           noIndent={true}
           keyExtractor={item => item?.timeStamp}
           ListEmptyComponent={() => (

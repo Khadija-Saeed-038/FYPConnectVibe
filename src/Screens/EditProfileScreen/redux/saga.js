@@ -1,4 +1,5 @@
 import {call, put, select, takeLatest, all} from 'redux-saga/effects';
+import {Toast} from 'react-native-toast-notifications';
 import {UPDATE_PROFILE, GET_PROFILE} from './types';
 import {
   updateProfileSuccess,
@@ -215,6 +216,7 @@ function* updateProfileApiCall({data}) {
     if (!sync.ok && sync.error !== 'NO_ENERGY_MATCH_TOKEN' && __DEV__) {
       console.warn('[EnergyMatch] profile sync after edit profile:', sync.error);
     }
+    Toast.show('Profile updated');
   } catch (e) {
     const {response} = e;
     yield put(updateProfileFailure(response));

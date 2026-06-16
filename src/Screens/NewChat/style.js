@@ -62,6 +62,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  listFlex: {
+    flex: 1,
+    width: '100%',
+  },
 });
 
 export default styles;

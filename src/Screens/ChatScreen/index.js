@@ -6,8 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  LayoutAnimation,
-  UIManager,
   FlatList,
   Alert,
   Platform,
@@ -15,10 +13,8 @@ import {
 } from 'react-native';
 import React, {useState, useRef, useMemo, useEffect} from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import Entypo from 'react-native-vector-icons/Entypo';
 import {useNavigation, useIsFocused} from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import database from '@react-native-firebase/database';
 import auth from '@react-native-firebase/auth';
 import {RTDB_MESSAGES_PATH} from '../../Config/firebase';
@@ -30,10 +26,8 @@ import {
   getPeerFromRouteData,
 } from '../../Utils/toChatProfile';
 
-import ImageCropPicker from 'react-native-image-crop-picker';
 import {connect} from 'react-redux';
 import {getStyles} from './style';
-import {addNotification as addNotificationAction} from './redux/actions';
 import {useThemeColor} from '../ThemeProvider/redux/saga';
 import {Toast} from 'react-native-toast-notifications';
 import {useImages} from '../../Utils/Images';
@@ -41,7 +35,6 @@ import moment from 'moment';
 // FIREBASE COMMENTED OUT - Backend functionality disabled
 // import storage from '@react-native-firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {launchImageLibrary} from 'react-native-image-picker';
 import {energyMatchRequest} from '../../Utils/energyMatchClient';
 import {buildTranscriptPayloadFromFirebaseMessages} from '../../Utils/energyMatchTranscript';
 import {recoverEnergyMatchTokenSilently} from '../../Utils/energyMatchSession';
@@ -54,17 +47,13 @@ import {
   markChatAsRead,
 } from '../../Utils/readReceipts';
 
-UIManager.setLayoutAnimationEnabledExperimental &&
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-
-const Chat = ({route, theme, addNotificationAction, userDetail}) => {
+const Chat = ({route, theme, userDetail}) => {
   const isFocused = useIsFocused();
   const AUTO_REFLECTION_THROTTLE_MS = 15000;
   const ENERGY_TOKEN_TOAST_THROTTLE_MS = 30000;
   const [inputValue, setInputValue] = useState('');
   const [preview, setPreview] = useState(false);
   const [assets, setAssets] = useState([]);
-  const [linkOpen, setLinkOpen] = useState(false);
   const [energyModal, setEnergyModal] = useState(null);
   const [energyBusy, setEnergyBusy] = useState(false);
   const [energyMatches, setEnergyMatches] = useState(null);
@@ -99,132 +88,6 @@ const Chat = ({route, theme, addNotificationAction, userDetail}) => {
     setState(pre => ({...pre, [key]: value}));
   };
 
-  const openCamera = () => {
-    // FIREBASE COMMENTED OUT - Backend functionality disabled
-    // Image upload to Firebase Storage disabled
-    ImageCropPicker.openCamera({
-      width: 300,
-      height: 400,
-      cropping: true,
-    })
-      .then(async response => {
-        if (!response.path) {
-          handleChange('uploading', false);
-        } else {
-          // FIREBASE COMMENTED OUT - Firebase Storage disabled
-          // const uri = response.path;
-          // const filename = Date.now();
-          // const uploadUri =
-          //   Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
-          // const task = storage()
-          //   .ref('Chat/' + filename)
-          //   .putFile(uploadUri);
-          // // set progress state
-          // task.on('state_changed', snapshot => {});
-          // try {
-          //   const durl = await task;
-          //   task.snapshot.ref.getDownloadURL().then(downloadURL => {
-          //     handleSendMessage(downloadURL, 'image');
-          //   });
-          // } catch (e) {
-          //   console.error(e);
-          // }
-          // Use local URI instead for UI testing
-          handleSendMessage(response.path, 'image');
-          handleChange('uploading', false);
-        }
-      })
-      .catch(err => {
-        handleChange('showAlert', false);
-        handleChange('uploading', false);
-      });
-  };
-
-  const openGallery = () => {
-    // FIREBASE COMMENTED OUT - Backend functionality disabled
-    // Image upload to Firebase Storage disabled
-    ImageCropPicker.openPicker({
-      mediaType: 'video',
-      width: 300,
-      height: 400,
-      cropping: true,
-    })
-      .then(async response => {
-        if (!response.path) {
-          handleChange('uploading', false);
-        } else {
-          // FIREBASE COMMENTED OUT - Firebase Storage disabled
-          // const uri = response.path;
-          // const filename = Date.now();
-          // const uploadUri =
-          //   Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
-          // const task = storage()
-          //   .ref('Chat/' + filename)
-          //   .putFile(uploadUri);
-          // task.on('state_changed', snapshot => {});
-          // try {
-          //   await task;
-          //   task.snapshot.ref.getDownloadURL().then(downloadURL => {
-          //     handleSendMessage(downloadURL, 'image');
-          //   });
-          // } catch (e) {
-          //   console.error(e);
-          // }
-          // Use local URI instead for UI testing
-          handleSendMessage(response.path, 'image');
-          handleChange('uploading', false);
-        }
-      })
-      .catch(err => {
-        handleChange('showAlert', false);
-        handleChange('uploading', false);
-      });
-  };
-
-  // const openVideo = async () => {
-  //   await launchImageLibrary({
-  //     mediaType: 'video',
-  //     width: 300,
-  //     height: 400,
-  //     durationLimit: 20,
-  //   })
-  //     .then(async response => {
-  //       if (!response) {
-  //         console.log('response', response?.assets[0]);
-  //         return handleChange('uploading', false);
-  //       }
-  //       console.log(response, 'response');
-  //       const uri = response?.assets[0]?.uri;
-  //       const filename = Date.now();
-  //       const uploadUri =
-  //         Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
-  //       const task = storage()
-  //         .ref('Chat/' + filename)
-  //         .putFile(uploadUri);
-
-  //       task.on('state_changed', snapshot => {});
-  //       try {
-  //         await task;
-  //         const downloadURL = await task.snapshot.ref.getDownloadURL();
-  //         handleSendMessage(downloadURL, 'video');
-  //       } catch (e) {
-  //         console.error(e);
-  //       } finally {
-  //         handleChange('uploading', false);
-  //       }
-  //     })
-  //     .catch(err => {
-  //       console.error(err);
-  //       handleChange('showAlert', false);
-  //       handleChange('uploading', false);
-  //     });
-  // };
-
-  const toggleAnimation = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setLinkOpen(!linkOpen);
-  };
-
   let scrollView;
   const downButtonHandler = () => {
     if (scrollView !== null) {
@@ -240,7 +103,6 @@ const Chat = ({route, theme, addNotificationAction, userDetail}) => {
 
   const handleSendMessage = async (text, type) => {
     try {
-      setLinkOpen(false);
       if (chatBlocked) {
         Toast.show(blockReasonText || "You can't message this user");
         return;
@@ -305,14 +167,6 @@ const Chat = ({route, theme, addNotificationAction, userDetail}) => {
       console.error(err);
       Toast.show('Something went wrong!', Toast.LONG);
       setState(prevState => ({...prevState, loading: false}));
-    }
-  };
-
-  const sendNotification = async notificationData => {
-    try {
-      await addNotificationAction(notificationData);
-    } catch (error) {
-      console.error('Error sending notification:', error);
     }
   };
 
@@ -1049,57 +903,6 @@ const Chat = ({route, theme, addNotificationAction, userDetail}) => {
           }}
         />
 
-        {linkOpen && (
-          <View
-            style={[
-              styles.inputInnerContainer,
-              {
-                height: 100,
-                justifyContent: 'space-evenly',
-                marginHorizontal: 20,
-                backgroundColor: inputBackground,
-              },
-            ]}>
-            {/* <TouchableOpacity
-              style={{
-                backgroundColor: 'purple',
-                width: 50,
-                height: 50,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: 25,
-              }}
-              onPress={openVideo}>
-              <Ionicons size={25} color={'white'} name={'videocam'} />
-            </TouchableOpacity> */}
-
-            <TouchableOpacity
-              style={{
-                backgroundColor: buttonColor,
-                width: 48,
-                height: 48,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: 24,
-              }}
-              onPress={openGallery}>
-              <MaterialIcons size={22} color={textOnButton} name={'insert-photo'} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                backgroundColor: textColor,
-                width: 48,
-                height: 48,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: 24,
-              }}
-              onPress={openCamera}>
-              <MaterialIcons size={22} color={textOnButton} name={'add-a-photo'} />
-            </TouchableOpacity>
-          </View>
-        )}
-
         {chatBlocked ? (
           <View
             style={{
@@ -1117,7 +920,7 @@ const Chat = ({route, theme, addNotificationAction, userDetail}) => {
           </View>
         ) : null}
 
-        <View style={{flexDirection: 'row'}}>
+        <View style={styles.composerRow}>
           <View
             style={[
               styles.inputInnerContainer,
@@ -1132,14 +935,6 @@ const Chat = ({route, theme, addNotificationAction, userDetail}) => {
                 onChangeText={setInputValue}
                 editable={!chatBlocked}
               />
-            </View>
-            <View style={styles.iconContainer}>
-              <TouchableOpacity onPress={toggleAnimation} disabled={chatBlocked}>
-                <Entypo size={25} color={textColor} name={'link'} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={openCamera} disabled={chatBlocked}>
-                <Entypo size={25} color={textColor} name={'camera'} />
-              </TouchableOpacity>
             </View>
           </View>
           <Pressable
@@ -1184,7 +979,5 @@ const mapStateToProps = state => ({
   userDetail: state?.login?.userDetail?.user,
 });
 
-const mapDispatchToProps = dispatch => ({
-  addNotificationAction: data => dispatch(addNotificationAction(data)),
-});
+const mapDispatchToProps = () => ({});
 export default connect(mapStateToProps, mapDispatchToProps)(Chat);

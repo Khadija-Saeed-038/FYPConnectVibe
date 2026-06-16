@@ -275,6 +275,7 @@ const Signup = ({navigation, signupAction, requesting}) => {
             <Button
               onPress={handleSubmit(signupButton)}
               text={'Register'}
+              disabled={requesting}
               textStyle={{
                 fontSize: 20,
                 fontWeight: 'bold',

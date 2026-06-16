@@ -4,11 +4,10 @@
 
 import '@react-native-firebase/app';
 import messaging from '@react-native-firebase/messaging';
+import {showLocalPushNotification} from './src/Utils/pushDisplay';
 
 messaging().setBackgroundMessageHandler(async remoteMessage => {
-  if (__DEV__) {
-    console.log('[FCM] background message', remoteMessage?.messageId);
-  }
+  showLocalPushNotification(remoteMessage);
 });
 
 import {AppRegistry} from 'react-native';

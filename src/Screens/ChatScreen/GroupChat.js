@@ -6,39 +6,38 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  LayoutAnimation,
-  UIManager,
   FlatList,
   Alert,
   Platform,
   Modal,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import Entypo from 'react-native-vector-icons/Entypo';
 import {useNavigation, useIsFocused} from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import database from '@react-native-firebase/database';
 import auth from '@react-native-firebase/auth';
 import {RTDB_MESSAGES_PATH} from '../../Config/firebase';
 import {blockRtdbTarget, submitRtdbReport} from '../../Utils/safetyActions';
 import {showGroupChatMenu, promptReportReason} from '../../Utils/safetyMenu';
 
-import ImageCropPicker from 'react-native-image-crop-picker';
 import {connect} from 'react-redux';
 import {getStyles} from './style';
-import {addNotification as addNotificationAction} from './redux/actions';
 import {useThemeColor} from '../ThemeProvider/redux/saga';
 // import {pick, types} from 'react-native-document-picker';
 import {Toast} from 'react-native-toast-notifications';
-import {useEffect} from 'react';
 import {useImages} from '../../Utils/Images';
 import moment from 'moment';
 import {energyMatchRequest} from '../../Utils/energyMatchClient';
 import {buildTranscriptPayloadFromFirebaseMessages} from '../../Utils/energyMatchTranscript';
 import {inferVibeAndDjangoMoodFromReflection} from '../../Utils/energyMatchMoodInference';
-import {isGroupMember} from '../../Utils/groupMembers';
+import {
+  backfillGroupAdminIdIfNeeded,
+  isGroupAdmin,
+  isGroupMember,
+  leaveGroup,
+  renameGroup,
+} from '../../Utils/groupMembers';
 import {
   canMarkGroupRead,
   getGroupReadStatus,
@@ -49,9 +48,6 @@ import EnergyMatchModal from '../../Components/EnergyMatchModal';
 // FIREBASE COMMENTED OUT - Backend functionality disabled
 // import storage from '@react-native-firebase/storage';
 import ImageViewer from 'react-native-image-zoom-viewer';
-
-UIManager.setLayoutAnimationEnabledExperimental &&
-  UIManager.setLayoutAnimationEnabledExperimental(true);
 
 function getParticipantById(messageData, senderId) {
   const sid = String(senderId ?? '');
@@ -69,12 +65,11 @@ function getSenderDisplayName(messageData, senderId) {
   return name || (sid ? `User ${sid.slice(-4)}` : 'User');
 }
 
-const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
+const GroupChat = ({route, theme, userDetail}) => {
   const isFocused = useIsFocused();
   const [inputValue, setInputValue] = useState('');
   const [preview, setPreview] = useState(false);
   const [assets, setAssets] = useState([]);
-  const [linkOpen, setLinkOpen] = useState(false);
   const [energyModal, setEnergyModal] = useState(null);
   const [energyBusy, setEnergyBusy] = useState(false);
   const [energyMatches, setEnergyMatches] = useState(null);
@@ -83,13 +78,13 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
   const [renameDraft, setRenameDraft] = useState('');
   const [removedFromGroup, setRemovedFromGroup] = useState(false);
   const [state, setState] = useState({
-    listHeight: 0,
-    scrollViewHeight: 0,
     uploading: false,
     messages: [],
     messageText: '',
     messageData: null,
   });
+  const listRef = useRef(null);
+  const initialScrollDoneRef = useRef(false);
   const {images} = useImages();
   const navigation = useNavigation();
   const styles = getStyles(theme);
@@ -101,147 +96,34 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
     setState(pre => ({...pre, [key]: value}));
   };
 
-  const openCamera = () => {
-    if (removedFromGroup) {
-      Toast.show('You were removed from this group');
-      return;
-    }
-    // FIREBASE COMMENTED OUT - Backend functionality disabled
-    // Image upload to Firebase Storage disabled
-    ImageCropPicker.openCamera({
-      width: 300,
-      height: 400,
-      cropping: true,
-    })
-      .then(async response => {
-        if (!response.path) {
-          handleChange('uploading', false);
-        } else {
-          // FIREBASE COMMENTED OUT - Firebase Storage disabled
-          // const uri = response.path;
-          // const filename = Date.now();
-          // const uploadUri =
-          //   Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
-          // const task = storage()
-          //   .ref('Chat/' + filename)
-          //   .putFile(uploadUri);
-          // // set progress state
-          // task.on('state_changed', snapshot => {});
-          // try {
-          //   const durl = await task;
-          //   task.snapshot.ref.getDownloadURL().then(downloadURL => {
-          //     handleSendMessage(downloadURL, 'image');
-          //   });
-          // } catch (e) {
-          //   console.error(e);
-          // }
-          // Use local URI instead for UI testing
-          handleSendMessage(response.path, 'image');
-          handleChange('uploading', false);
-        }
-      })
-      .catch(err => {
-        handleChange('showAlert', false);
-        handleChange('uploading', false);
-      });
+  const scrollToBottom = (animated = true) => {
+    listRef.current?.scrollToEnd?.({animated});
   };
 
-  const openGallery = () => {
-    if (removedFromGroup) {
-      Toast.show('You were removed from this group');
-      return;
-    }
-    // FIREBASE COMMENTED OUT - Backend functionality disabled
-    // Image upload to Firebase Storage disabled
-    ImageCropPicker.openPicker({
-      width: 300,
-      height: 400,
-      cropping: true,
-    })
-      .then(async response => {
-        if (!response.path) {
-          handleChange('uploading', false);
-        } else {
-          // FIREBASE COMMENTED OUT - Firebase Storage disabled
-          // const uri = response.path;
-          // const filename = Date.now();
-          // const uploadUri =
-          //   Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
-          // const task = storage()
-          //   .ref('Chat/' + filename)
-          //   .putFile(uploadUri);
-          // task.on('state_changed', snapshot => {});
-          // try {
-          //   await task;
-          //   task.snapshot.ref.getDownloadURL().then(downloadURL => {
-          //     handleSendMessage(downloadURL, 'image');
-          //   });
-          // } catch (e) {
-          //   console.error(e);
-          // }
-          // Use local URI instead for UI testing
-          handleSendMessage(response.path, 'image');
-          handleChange('uploading', false);
-        }
-      })
-      .catch(err => {
-        handleChange('showAlert', false);
-        handleChange('uploading', false);
-      });
-  };
-
-  // const openDocument = async () => {
-  //   pick({
-  //     type: [types.pdf, types.docx],
-  //   })
-  //     .then(async response => {
-  //       const uri = response[0].uri;
-  //       const filename = response[0].name;
-  //       const uploadUri =
-  //         Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
-  //       const task = storage()
-  //         .ref('Chat/' + filename)
-  //         .putFile(uploadUri);
-  //       task.on('state_changed', snapshot => {});
-  //       try {
-  //         await task;
-  //         task.snapshot.ref.getDownloadURL().then(downloadURL => {
-  //           handleSendMessage(downloadURL, 'document');
-  //         });
-  //       } catch (e) {
-  //         console.error(e);
-  //       }
-  //       handleChange('uploading', false);
-  //     })
-  //     .catch(err => {
-  //       handleChange('showAlert', false);
-  //       handleChange('uploading', false);
-  //     });
-  // };
-
-  const toggleAnimation = () => {
-    if (removedFromGroup) {
-      return;
-    }
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setLinkOpen(!linkOpen);
-  };
-
-  let scrollView;
-  const downButtonHandler = () => {
-    if (scrollView !== null) {
-      scrollView.scrollToEnd !== null &&
-        scrollView.scrollToEnd({animated: true});
-    }
-  };
   useEffect(() => {
-    if (scrollView !== null) {
-      downButtonHandler();
+    if (!isFocused) {
+      initialScrollDoneRef.current = false;
     }
-  });
+  }, [isFocused]);
+
+  useEffect(() => {
+    initialScrollDoneRef.current = false;
+  }, [messageuid]);
+
+  useEffect(() => {
+    if (!messageuid || initialScrollDoneRef.current) {
+      return;
+    }
+    if (state.messageData == null && state.messages.length === 0) {
+      return;
+    }
+    initialScrollDoneRef.current = true;
+    requestAnimationFrame(() => {
+      scrollToBottom(false);
+    });
+  }, [messageuid, state.messageData, state.messages.length]);
 
   const handleSendMessage = async (text, type) => {
-    setLinkOpen(false);
     if (removedFromGroup) {
       Toast.show('You were removed from this group');
       return;
@@ -270,7 +152,7 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
           messageText: '',
           messages,
         }));
-        downButtonHandler();
+        scrollToBottom(true);
         setInputValue('');
       } catch (err) {
         Toast.show('Something went wrong!', Toast.LONG);
@@ -317,6 +199,7 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
       return undefined;
     }
     const roomRef = database().ref(`${RTDB_MESSAGES_PATH}/${messageuid}`);
+    backfillGroupAdminIdIfNeeded(messageuid).catch(() => {});
     const onVal = snapshot => {
       if (snapshot.val()) {
         const v = snapshot.val();
@@ -396,9 +279,16 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
       return;
     }
     try {
-      await database()
-        .ref(`${RTDB_MESSAGES_PATH}/${messageuid}/name`)
-        .set(t);
+      const r = await renameGroup(
+        messageuid,
+        t,
+        userDetail?.id,
+        userDetail,
+      );
+      if (!r.ok) {
+        Toast.show(r.error || 'Could not rename');
+        return;
+      }
       setState(prev => ({
         ...prev,
         messageData: prev.messageData
@@ -411,6 +301,35 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
     } finally {
       setRenameModalVisible(false);
     }
+  };
+
+  const confirmLeaveGroup = () => {
+    if (!messageuid) {
+      return;
+    }
+    Alert.alert(
+      'Leave group',
+      'You will no longer receive messages from this group.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const r = await leaveGroup(messageuid, userDetail?.id, userDetail);
+              if (!r.ok) {
+                Toast.show(r.error || 'Could not leave group');
+                return;
+              }
+              navigation.navigate('BottomBar');
+            } catch (e) {
+              Toast.show('Something went wrong');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const promptRenameGroup = () => {
@@ -490,7 +409,10 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
           ],
         );
       },
-      onRename: promptRenameGroup,
+      onRename: isGroupAdmin(messageData, userDetail?.id)
+        ? promptRenameGroup
+        : undefined,
+      onLeave: confirmLeaveGroup,
     });
   };
 
@@ -685,29 +607,44 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
           alignItems: 'flex-start',
           justifyContent: 'flex-end',
         }}
-        onContentSizeChange={(contentWidth, contentHeight) => {
-          setState(prevState => ({
-            ...prevState,
-            listHeight: contentHeight,
-          }));
-        }}
-        onLayout={e => {
-          const height = e.nativeEvent.layout.height;
-          setState(prevState => ({
-            ...prevState,
-            scrollViewHeight: height,
-          }));
-        }}
-        ref={ref => {
-          scrollView = ref;
-        }}
+        ref={listRef}
         showsVerticalScrollIndicator={false}
         keyExtractor={(item, index) => index?.toString()}
         renderItem={({item, index}) => {
-          // const senderName = findPartcipents(item);
           if (item == null) {
             return <View />;
-          } else if (item?.senderId !== userDetail?.id) {
+          }
+          if (item?.type === 'system') {
+            return (
+              <View
+                key={index}
+                style={{
+                  width: '100%',
+                  alignItems: 'center',
+                  marginVertical: 8,
+                  paddingHorizontal: 24,
+                }}>
+                <View
+                  style={{
+                    backgroundColor: `${textColor}18`,
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    maxWidth: '90%',
+                  }}>
+                  <Text
+                    style={{
+                      color: textSecondary,
+                      fontSize: 12,
+                      textAlign: 'center',
+                    }}>
+                    {item?.text}
+                  </Text>
+                </View>
+              </View>
+            );
+          }
+          if (item?.senderId !== userDetail?.id) {
             const messages = state?.messages || [];
             const prev = index > 0 ? messages[index - 1] : null;
             const showSenderHeader =
@@ -942,59 +879,8 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
         </View>
       ) : null}
 
-      {linkOpen && !removedFromGroup && (
-        <View
-          style={[
-            styles.inputInnerContainer,
-            {
-              height: 100,
-              justifyContent: 'space-evenly',
-              marginHorizontal: 20,
-              backgroundColor: inputBackground,
-            },
-          ]}>
-          {/* <TouchableOpacity
-            style={{
-              backgroundColor: 'purple',
-              width: 50,
-              height: 50,
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderRadius: 25,
-            }}
-            onPress={openDocument}>
-            <Ionicons size={25} color={'white'} name={'document'} />
-          </TouchableOpacity> */}
-
-          <TouchableOpacity
-            style={{
-              backgroundColor: buttonColor,
-              width: 48,
-              height: 48,
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderRadius: 24,
-            }}
-            onPress={openGallery}>
-            <MaterialIcons size={22} color={textOnButton} name={'insert-photo'} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{
-              backgroundColor: textColor,
-              width: 48,
-              height: 48,
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderRadius: 24,
-            }}
-            onPress={openCamera}>
-            <MaterialIcons size={22} color={textOnButton} name={'add-a-photo'} />
-          </TouchableOpacity>
-        </View>
-      )}
-
       {!removedFromGroup ? (
-      <View style={{flexDirection: 'row'}}>
+      <View style={styles.composerRow}>
         <View
           style={[
             styles.inputInnerContainer,
@@ -1008,14 +894,6 @@ const GroupChat = ({route, theme, addNotificationAction, userDetail}) => {
               value={inputValue}
               onChangeText={setInputValue}
             />
-          </View>
-          <View style={styles.iconContainer}>
-            <TouchableOpacity onPress={toggleAnimation}>
-              <Entypo size={25} color={textColor} name={'link'} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={openCamera}>
-              <Entypo size={25} color={textColor} name={'camera'} />
-            </TouchableOpacity>
           </View>
         </View>
         <Pressable
@@ -1141,7 +1019,5 @@ const mapStateToProps = state => ({
   userDetail: state?.login?.userDetail?.user,
 });
 
-const mapDispatchToProps = dispatch => ({
-  addNotificationAction: data => dispatch(addNotificationAction(data)),
-});
+const mapDispatchToProps = () => ({});
 export default connect(mapStateToProps, mapDispatchToProps)(GroupChat);

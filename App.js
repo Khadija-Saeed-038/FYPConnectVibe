@@ -5,17 +5,22 @@ import {Provider} from 'react-redux';
 import store from './src/Redux/store';
 import AnimatedSplash from 'react-native-animated-splash-screen';
 import SplashScreen from './src/Screens/SplashScreen';
-import {Dimensions, Platform} from 'react-native';
+import {Dimensions, Platform, StatusBar} from 'react-native';
 import {persistStore} from 'redux-persist';
 import {PersistGate} from 'redux-persist/integration/react';
 
 import {ThemeProvider} from './src/Screens/ThemeProvider/ThemeProvider';
 import messaging from '@react-native-firebase/messaging';
-import PushNotification from 'react-native-push-notification';
 import {bootstrapEnergyMatchSession} from './src/Utils/energyMatchSession';
-
+import {attachAuthNotificationBootstrap} from './src/Utils/notification';
+import {
+  configurePushNotifications,
+  showLocalPushNotification,
+} from './src/Utils/pushDisplay';
 
 const persist = persistStore(store);
+const toastOffsetTop =
+  Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 44;
 
 export default function App() {
   const [loading, setLoading] = useState(false);
@@ -24,32 +29,18 @@ export default function App() {
   const logoWidth = width;
 
   useEffect(() => {
-    PushNotification.createChannel({
-      channelId: 'com.connectvibe',
-      channelName: 'com.connectvibe',
+    configurePushNotifications();
+
+    const unsubscribeAuth = attachAuthNotificationBootstrap();
+
+    const unsubscribeMessage = messaging().onMessage(async remoteMessage => {
+      showLocalPushNotification(remoteMessage);
     });
 
-    const unsubscribe = messaging().onMessage(async remoteMessage => {
-      const title = remoteMessage?.notification?.title;
-      const body = remoteMessage?.notification?.body ?? '';
-      if (!title) {
-        return;
-      }
-      let localNotification = {
-        id: String(remoteMessage?.messageId ?? Date.now()),
-        title,
-        message: body,
-      };
-      if (Platform.OS === 'android') {
-        localNotification = {
-          ...localNotification,
-          channelId: 'com.connectvibe',
-        };
-      }
-      PushNotification.localNotification(localNotification);
-    });
-
-    return unsubscribe;
+    return () => {
+      unsubscribeAuth();
+      unsubscribeMessage();
+    };
   }, []);
 
   useEffect(() => {
@@ -75,7 +66,7 @@ export default function App() {
   }, []);
 
   return (
-    <ToastProvider>
+    <ToastProvider placement="top" offsetTop={toastOffsetTop}>
       <ThemeProvider>
         <AnimatedSplash
           isLoaded={loading}

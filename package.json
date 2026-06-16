@@ -10,7 +10,9 @@
     "test": "jest",
     "build": "cd android && ./gradlew assembleRelease",
     "clean": "cd android && ./gradlew clean",
-    "deploy:database": "npx --yes firebase-tools@latest deploy --only database"
+    "deploy:database": "npx --yes firebase-tools@latest deploy --only database",
+    "deploy:functions": "npx --yes firebase-tools@latest deploy --only functions",
+    "deploy:rules": "npx --yes firebase-tools@latest deploy --only database,firestore"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

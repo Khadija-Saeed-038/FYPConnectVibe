@@ -1,12 +1,12 @@
 import {
   ActivityIndicator,
   Image,
+  Platform,
   SafeAreaView,
   StatusBar,
   TextInput,
   TouchableOpacity,
   View,
-  Dimensions,
   FlatList,
   Text,
 } from 'react-native';
@@ -18,8 +18,6 @@ import {useThemeColor} from '../ThemeProvider/redux/saga';
 import {getUser as getUserAction} from './redux/action';
 import styles from './style';
 import {Toast} from 'react-native-toast-notifications';
-
-const height = Dimensions.get('window').height;
 
 const AddUser = ({
   navigation,
@@ -83,10 +81,16 @@ const AddUser = ({
   const borderColor = useThemeColor('border');
   const placeholderColor = useThemeColor('placeholder');
   const searchBar = useThemeColor('inputBackground');
+  const androidStatusBarInset =
+    Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
 
   return (
     <SafeAreaView
-      style={[styles.container, {backgroundColor: backgroundColor}]}>
+      style={[
+        styles.container,
+        {backgroundColor: backgroundColor},
+        androidStatusBarInset > 0 && {paddingTop: androidStatusBarInset},
+      ]}>
       <StatusBar
         animated={true}
         backgroundColor={headerBackgroundColor}
@@ -145,70 +149,72 @@ const AddUser = ({
         </TouchableOpacity>
       </View>
 
-      <View
-        style={{
-          marginVertical: 20,
-          marginHorizontal: 20,
-          height: height - 110,
-        }}>
-        {loading ? (
-          <View style={{marginVertical: '50%'}}>
-            <ActivityIndicator color={textColor} size={'large'} />
-          </View>
-        ) : Array.isArray(userSearched) && userSearched.length > 0 ? (
-          <FlatList
-            data={userSearched}
-            keyExtractor={item => String(item?.id)}
-            renderItem={({item, index}) => (
-              <>
-                <TouchableOpacity
-                  style={[
-                    styles.chatContainer,
-                    {borderBottomColor: borderColor},
-                  ]}
-                  disabled={creatingRoomId != null}
-                  onPress={() => createAndNavigate(item)}>
-                  <View
-                    style={[
-                      styles.imageContainer,
-                      {backgroundColor: buttonColor},
-                    ]}>
-                    {(!item?.profile_image || typeof item?.profile_image !== 'string') ? (
-                      <Text style={[styles.imgText, {color: textOnButton}]}>
-                        {(item?.name || '?').trim().charAt(0).toUpperCase() || '?'}
-                      </Text>
-                    ) : (
-                      <Image
-                        source={{uri: item?.profile_image}}
-                        style={styles.image}
-                      />
-                    )}
-                  </View>
-                  <View style={styles.textContainer} key={index}>
-                    <View style={{marginLeft: 10}}>
-                      <Text style={[styles.userName, {color: textColor}]}>
-                        {item?.name}
-                      </Text>
-                    </View>
-                  </View>
-                  {String(creatingRoomId) === String(item.id) ? (
-                    <ActivityIndicator color={textColor} size="small" />
-                  ) : null}
-                </TouchableOpacity>
-              </>
-            )}
-          />
-        ) : (
-          <View
-            style={{
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginVertical: '50%',
-            }}>
-            <Text style={{color: textColor}}>No user Found</Text>
-          </View>
-        )}
-      </View>
+      {loading ? (
+        <View style={{flex: 1, justifyContent: 'center'}}>
+          <ActivityIndicator color={textColor} size={'large'} />
+        </View>
+      ) : (
+        <FlatList
+          style={styles.listFlex}
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingTop: 20,
+            paddingBottom: 20,
+            flexGrow: 1,
+          }}
+          data={Array.isArray(userSearched) ? userSearched : []}
+          keyExtractor={item => String(item?.id)}
+          ListEmptyComponent={
+            <View
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingVertical: 40,
+              }}>
+              <Text style={{color: textColor}}>No user Found</Text>
+            </View>
+          }
+          renderItem={({item, index}) => (
+            <TouchableOpacity
+              style={[
+                styles.chatContainer,
+                {borderBottomColor: borderColor},
+              ]}
+              disabled={creatingRoomId != null}
+              onPress={() => createAndNavigate(item)}>
+              <View
+                style={[
+                  styles.imageContainer,
+                  {backgroundColor: buttonColor},
+                ]}>
+                {(!item?.profile_image ||
+                typeof item?.profile_image !== 'string') ? (
+                  <Text style={[styles.imgText, {color: textOnButton}]}>
+                    {(item?.name || '?').trim().charAt(0).toUpperCase() ||
+                      '?'}
+                  </Text>
+                ) : (
+                  <Image
+                    source={{uri: item?.profile_image}}
+                    style={styles.image}
+                  />
+                )}
+              </View>
+              <View style={styles.textContainer} key={index}>
+                <View style={{marginLeft: 10}}>
+                  <Text style={[styles.userName, {color: textColor}]}>
+                    {item?.name}
+                  </Text>
+                </View>
+              </View>
+              {String(creatingRoomId) === String(item.id) ? (
+                <ActivityIndicator color={textColor} size="small" />
+              ) : null}
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 };

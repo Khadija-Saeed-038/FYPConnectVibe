@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "prefabPath": "/Users/awais/.gradle/caches/modules-2/files-2.1/com.google.prefab/cli/2.1.0/aa32fec809c44fa531f01dcfb739b5b3304d3050/cli-2.1.0-all.jar",
+  "packages": [
+    "/Users/awais/.gradle/caches/8.12/transforms/311fffaeac7fe26a3779ba2177aa68c1/transformed/react-android-0.78.0-release/prefab",
+    "/Users/awais/Documents/App Projects/ConnectVibe-main/node_modules/react-native-reanimated/android/build/intermediates/prefab_package/release/prefab",
+    "/Users/awais/.gradle/caches/8.12/transforms/69080e43184dc1c9c94b095ba5a35e01/transformed/hermes-android-0.78.0-release/prefab",
+    "/Users/awais/.gradle/caches/8.12/transforms/884ef1284853c9ca940e1bf1962452c1/transformed/fbjni-0.7.0/prefab"
+  ]
+}

@@ -9,31 +9,15 @@ import {
 } from './actions';
 
 async function getNotificationAPi() {
-  // Notifications can be stored in Firestore later; keep local empty list for now.
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        data: []
-      });
-    }, 300);
-  });
+  return {data: []};
 }
 
-async function addNotificationAPi(data) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        data: {
-          id: Date.now(),
-          message: 'Notification sent',
-          ...data
-        }
-      });
-    }, 300);
-  });
+async function addNotificationAPi() {
+  // Push delivery is handled by Firebase Cloud Functions; no client-side send.
+  return {data: {ok: true}};
 }
 
-function* getNotificationApiCall({}) {
+function* getNotificationApiCall() {
   try {
     const response = yield call(getNotificationAPi);
     yield put(getNotificationSuccess(response.data));
@@ -43,9 +27,9 @@ function* getNotificationApiCall({}) {
   }
 }
 
-function* addNotificationApiCall({data}) {
+function* addNotificationApiCall() {
   try {
-    const response = yield call(addNotificationAPi, data);
+    const response = yield call(addNotificationAPi);
     yield put(addNotificationSuccess(response.data));
   } catch (e) {
     const {response} = e;

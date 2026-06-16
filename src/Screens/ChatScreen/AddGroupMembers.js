@@ -2,11 +2,11 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
-  Dimensions,
   TouchableOpacity,
   FlatList,
   Image,
   ActivityIndicator,
+  Platform,
   SafeAreaView,
   StatusBar,
   TextInput,
@@ -25,8 +25,7 @@ import Fontisto from 'react-native-vector-icons/Fontisto';
 import Entypo from 'react-native-vector-icons/Entypo';
 import {signal} from '@preact/signals-react';
 import {addGroupMembers, isGroupAdmin} from '../../Utils/groupMembers';
-
-const screenHeight = Dimensions.get('window').height;
+import Button from '../../Components/Button';
 
 const AddGroupMembers = ({
   navigation,
@@ -35,21 +34,20 @@ const AddGroupMembers = ({
   theme,
   getUserAction,
   userSearched,
+  searchLoading,
 }) => {
   const messageuid = route?.params?.messageuid;
   const [state, setState] = useState({
-    loading: false,
-    loadingAdd: false,
     allEmployee: [],
     participents: [],
     List: [],
     searchText: '',
     existingMemberIds: [],
     roomLoading: true,
+    loadingAdd: false,
   });
 
   const {
-    loading,
     searchText,
     allEmployee,
     List,
@@ -73,12 +71,14 @@ const AddGroupMembers = ({
     setState(pre => ({...pre, [key]: value}));
   };
 
-  const getAllUsers = () => {
-    handleChange('loading', true);
-    handleChange('allEmployee', users.value);
-    handleChange('List', users.value);
-    handleChange('loading', false);
-  };
+  useEffect(() => {
+    users.value = userSearched;
+    setState(pre => ({
+      ...pre,
+      allEmployee: userSearched,
+      List: userSearched,
+    }));
+  }, [userSearched, users]);
 
   const sortByUser = data => {
     return data?.filter(
@@ -103,6 +103,24 @@ const AddGroupMembers = ({
     } else {
       handleChange('List', allEmployee);
     }
+  };
+
+  const toggleParticipant = item => {
+    if (participents?.some(e => e?.id === item?.id)) {
+      handleChange(
+        'participents',
+        participents.filter(e => e?.id !== item?.id),
+      );
+    } else {
+      handleChange('participents', [...participents, item]);
+    }
+  };
+
+  const removeParticipant = itemId => {
+    handleChange(
+      'participents',
+      participents.filter(e => e?.id !== itemId),
+    );
   };
 
   useEffect(() => {
@@ -149,10 +167,16 @@ const AddGroupMembers = ({
     getUserAction('');
   }, [isFocused, getUserAction]);
 
-  useEffect(() => {
-    users.value = userSearched;
-    getAllUsers();
-  }, [userSearched]);
+  const backgroundColor = useThemeColor('primary');
+  const textColor = useThemeColor('text');
+  const headerBackgroundColor = useThemeColor('headerColor');
+  const headerTextColor = useThemeColor('headerText');
+  const borderColor = useThemeColor('border');
+  const buttonColor = useThemeColor('buttonColor');
+  const placeholderColor = useThemeColor('placeholder');
+  const searchBar = useThemeColor('inputBackground');
+  const androidStatusBarInset =
+    Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
 
   const addMembers = async () => {
     if (!participents?.length) {
@@ -164,7 +188,12 @@ const AddGroupMembers = ({
     }
     handleChange('loadingAdd', true);
     try {
-      const r = await addGroupMembers(messageuid, participents);
+      const r = await addGroupMembers(
+        messageuid,
+        participents,
+        userDetail?.id,
+        userDetail,
+      );
       if (!r.ok) {
         Toast.show(r.error || 'Could not add members');
         return;
@@ -186,18 +215,77 @@ const AddGroupMembers = ({
     }
   };
 
-  const backgroundColor = useThemeColor('primary');
-  const textColor = useThemeColor('text');
-  const headerBackgroundColor = useThemeColor('headerColor');
-  const headerTextColor = useThemeColor('headerText');
-  const borderColor = useThemeColor('border');
-  const placeholderColor = useThemeColor('placeholder');
-  const searchBar = useThemeColor('inputBackground');
+  const canAdd = participents.length > 0 && !loadingAdd;
+  const sortedList = sortByUser(List) || [];
+
+  const renderSelectedChip = ({item}) => (
+    <View style={styles.selectedChip}>
+      <TouchableOpacity
+        onPress={() => removeParticipant(item?.id)}
+        style={styles.selectedChipRemove}>
+        <Entypo name="cross" color="red" size={14} />
+      </TouchableOpacity>
+      <Image
+        source={
+          item?.profile_image && typeof item?.profile_image === 'string'
+            ? {uri: item.profile_image}
+            : images.profile
+        }
+        style={styles.selectedChipAvatar}
+      />
+      <Text style={styles.selectedChipName} numberOfLines={1}>
+        {item?.name}
+      </Text>
+    </View>
+  );
+
+  const renderMemberRow = ({item}) => {
+    const selected = participents?.some(e => e?.id === item?.id);
+    return (
+      <TouchableOpacity
+        style={styles.memberRow}
+        activeOpacity={0.7}
+        onPress={() => toggleParticipant(item)}>
+        <View style={styles.memberRowLeft}>
+          <Image
+            source={
+              item?.profile_image && typeof item?.profile_image === 'string'
+                ? {uri: item.profile_image}
+                : images.profile
+            }
+            style={styles.memberAvatar}
+          />
+          <Text style={styles.memberName} numberOfLines={1}>
+            {item?.name}
+          </Text>
+        </View>
+        <Fontisto
+          color={textColor}
+          size={22}
+          name={selected ? 'checkbox-active' : 'checkbox-passive'}
+        />
+      </TouchableOpacity>
+    );
+  };
+
+  const listHeader = () => (
+    <View style={styles.listHeaderBlock}>
+      <Text style={styles.helperTextLeft}>
+        Select people to add to this group.
+      </Text>
+      <Text style={styles.sectionTitle}>Suggested</Text>
+      {searchLoading ? <ActivityIndicator size="small" color={textColor} /> : null}
+    </View>
+  );
 
   if (roomLoading) {
     return (
       <SafeAreaView
-        style={[styles.container, {backgroundColor, justifyContent: 'center'}]}>
+        style={[
+          styles.container,
+          {backgroundColor, justifyContent: 'center'},
+          androidStatusBarInset > 0 && {paddingTop: androidStatusBarInset},
+        ]}>
         <ActivityIndicator color={textColor} />
       </SafeAreaView>
     );
@@ -205,24 +293,26 @@ const AddGroupMembers = ({
 
   return (
     <SafeAreaView
-      style={[styles.container, {backgroundColor: backgroundColor}]}>
+      style={[
+        styles.container,
+        {backgroundColor},
+        androidStatusBarInset > 0 && {paddingTop: androidStatusBarInset},
+      ]}>
       <StatusBar
         animated
         backgroundColor={headerBackgroundColor}
         barStyle="light-content"
       />
+
       <View style={styles.childContainerStyle}>
         <View
           style={[
             styles.header,
-            {
-              backgroundColor: headerBackgroundColor,
-              borderBottomColor: borderColor,
-            },
+            {backgroundColor: headerBackgroundColor, borderBottomColor: borderColor},
           ]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={{justifyContent: 'center', height: 45}}>
+            style={styles.backButtonHit}>
             <Ionicons size={25} color={headerTextColor} name="arrow-back" />
           </TouchableOpacity>
           <TextInput
@@ -236,139 +326,52 @@ const AddGroupMembers = ({
             onChangeText={value => filtered('searchText', value)}
           />
         </View>
-        <Text
-          style={{
-            marginTop: 12,
-            marginHorizontal: 12,
-            fontSize: 13,
-            opacity: 0.75,
-            color: textColor,
-            textAlign: 'center',
-          }}>
-          Select people to add to this group.
-        </Text>
+
+        {participents.length > 0 ? (
+          <FlatList
+            data={participents}
+            horizontal
+            keyExtractor={item => String(item?.id)}
+            style={styles.selectedChipsRow}
+            showsHorizontalScrollIndicator={false}
+            renderItem={renderSelectedChip}
+          />
+        ) : null}
+
         <FlatList
-          data={participents}
-          horizontal
-          style={{width: '100%', paddingLeft: '5%'}}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({item, index}) => (
-            <View
-              key={index}
-              style={{marginTop: 10, alignItems: 'center', marginRight: 10}}>
-              <TouchableOpacity
-                onPress={() => {
-                  const removed = participents?.filter(e => e?.id !== item?.id);
-                  handleChange('participents', removed);
-                }}
-                style={{
-                  width: 20,
-                  height: 20,
-                  marginRight: -30,
-                  marginBottom: -10,
-                  zIndex: 33,
-                  borderRadius: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: borderColor,
-                }}>
-                <Entypo name="cross" color="red" size={14} />
-              </TouchableOpacity>
-              <Image
-                source={
-                  item?.profile_image && typeof item?.profile_image === 'string'
-                    ? {uri: item.profile_image}
-                    : images.profile
-                }
-                style={{borderRadius: 5, width: 40, height: 40}}
-              />
-              <Text style={{textAlign: 'center', width: 60, marginTop: 5}}>
-                {item?.name}
-              </Text>
-            </View>
-          )}
-        />
-        <View
-          style={{
-            width: '90%',
-            alignItems: 'flex-end',
-            justifyContent: 'flex-end',
-            flexDirection: 'row',
-            marginTop: 8,
-          }}>
-          {loadingAdd && (
-            <ActivityIndicator size="small" style={{marginRight: 10}} />
-          )}
-          <TouchableOpacity
-            disabled={!participents?.length || loadingAdd}
-            onPress={addMembers}>
-            <Text
-              style={{
-                color: textColor,
-                opacity: participents?.length ? 1 : 0.45,
-              }}>
-              Add members
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={{marginTop: 10, marginHorizontal: 10}}>Suggested</Text>
-        {loading && <ActivityIndicator size="small" />}
-        <FlatList
-          data={sortByUser(List)}
+          data={sortedList}
+          keyExtractor={item => String(item?.id)}
+          style={styles.listFlex}
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          style={{width: '90%', marginTop: 20, height: screenHeight - 240}}
-          renderItem={({item, index}) => (
-            <View
-              key={index}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 20,
-                borderBottomWidth: 1,
-                paddingBottom: 10,
-                borderBottomColor: textColor,
-                marginHorizontal: 10,
-              }}>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Image
-                  source={
-                    item?.profile_image &&
-                    typeof item?.profile_image === 'string'
-                      ? {uri: item.profile_image}
-                      : images.profile
-                  }
-                  style={{
-                    borderRadius: 5,
-                    width: 50,
-                    height: 50,
-                    marginRight: 20,
-                  }}
-                />
-                <Text>{item?.name}</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  if (participents?.some(e => e?.id === item?.id)) {
-                    const removed = participents?.filter(e => e?.id !== item?.id);
-                    handleChange('participents', removed);
-                  } else {
-                    handleChange('participents', [...participents, item]);
-                  }
-                }}>
-                <Fontisto
-                  color={textColor}
-                  size={20}
-                  name={
-                    participents?.some(e => e?.id === item?.id)
-                      ? 'checkbox-active'
-                      : 'checkbox-passive'
-                  }
-                />
-              </TouchableOpacity>
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            <View style={styles.emptyList}>
+              <Text style={styles.emptyListText}>No users found</Text>
             </View>
-          )}
+          }
+          renderItem={renderMemberRow}
         />
+
+        <View style={styles.bottomBar}>
+          {participents.length > 0 ? (
+            <Text style={styles.selectionCount}>
+              {participents.length === 1
+                ? '1 member selected'
+                : `${participents.length} members selected`}
+            </Text>
+          ) : null}
+          <Button
+            text="Add members"
+            onPress={addMembers}
+            loading={loadingAdd}
+            disabled={!canAdd}
+            containerStyle={[
+              {backgroundColor: buttonColor},
+              !canAdd && styles.buttonDisabledOpacity,
+            ]}
+          />
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -377,7 +380,7 @@ const AddGroupMembers = ({
 const mapStateToProps = state => ({
   theme: state?.themes?.theme,
   userSearched: state?.searchUser?.profile,
-  loading: state?.searchUser?.requesting,
+  searchLoading: state?.searchUser?.requesting,
   userDetail: state?.login?.userDetail?.user,
 });
 

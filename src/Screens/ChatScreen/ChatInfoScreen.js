@@ -22,9 +22,14 @@ import {
   resolveBlockedMapToRows,
 } from '../../Utils/blockedUsersList';
 import {
+  activeMemberIdSet,
+  backfillGroupAdminIdIfNeeded,
   getGroupAdminId,
   isGroupAdmin,
+  isGroupMember,
+  leaveGroup,
   removeGroupMember,
+  transferGroupAdmin,
 } from '../../Utils/groupMembers';
 import {useThemeColor} from '../ThemeProvider/redux/saga';
 import {getStyles} from './style';
@@ -84,8 +89,16 @@ function buildDmMemberRows(roomVal, userDetail) {
 async function buildGroupMemberRows(roomVal, userDetail) {
   const myId = userDetail?.id != null ? String(userDetail.id) : '';
   const adminId = getGroupAdminId(roomVal);
+  const activeIds = activeMemberIdSet(roomVal);
+  const filterActive = id => {
+    if (activeIds.size === 0) {
+      return true;
+    }
+    return activeIds.has(String(id));
+  };
+
   const list = Array.isArray(roomVal?.participents)
-    ? roomVal.participents
+    ? roomVal.participents.filter(p => filterActive(p?.id))
     : [];
   if (list.length > 0) {
     return list.map((p, i) => {
@@ -106,7 +119,7 @@ async function buildGroupMemberRows(roomVal, userDetail) {
   }
 
   const ids = Array.isArray(roomVal?.participentIds)
-    ? roomVal.participentIds.map(x => String(x)).filter(Boolean)
+    ? roomVal.participentIds.map(x => String(x)).filter(Boolean).filter(filterActive)
     : [];
   if (ids.length === 0) {
     return [];
@@ -150,6 +163,8 @@ const ChatInfoScreen = ({navigation, route, theme, userDetail}) => {
   const [selectedMember, setSelectedMember] = useState(null);
   const [messageBusy, setMessageBusy] = useState(false);
   const [removeBusy, setRemoveBusy] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
 
   const kindNorm = kind === 'group' ? 'group' : 'dm';
   const myId = userDetail?.id != null ? String(userDetail.id) : '';
@@ -172,6 +187,9 @@ const ChatInfoScreen = ({navigation, route, theme, userDetail}) => {
     }
     setRoomLoading(true);
     const ref = database().ref(`${RTDB_MESSAGES_PATH}/${messageuid}`);
+    if (kindNorm === 'group') {
+      backfillGroupAdminIdIfNeeded(messageuid).catch(() => {});
+    }
     const onVal = async snapshot => {
       const val = snapshot.val();
       if (!val) {
@@ -242,7 +260,8 @@ const ChatInfoScreen = ({navigation, route, theme, userDetail}) => {
               const r = await removeGroupMember(
                 messageuid,
                 member.peerId,
-                getGroupAdminId(roomVal),
+                myId,
+                userDetail,
               );
               if (!r.ok) {
                 Toast.show(r.error || 'Could not remove member');
@@ -273,6 +292,87 @@ const ChatInfoScreen = ({navigation, route, theme, userDetail}) => {
     selectedMember?.peerId &&
     !selectedMember?.isYou &&
     !selectedMember?.isAdmin;
+
+  const canMakeAdminSelected =
+    kindNorm === 'group' &&
+    userIsGroupAdmin &&
+    selectedMember?.peerId &&
+    !selectedMember?.isYou &&
+    !selectedMember?.isAdmin;
+
+  const confirmLeaveGroup = () => {
+    if (!messageuid) {
+      return;
+    }
+    Alert.alert(
+      'Leave group',
+      'You will no longer receive messages from this group.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            setLeaveBusy(true);
+            try {
+              const r = await leaveGroup(messageuid, myId, userDetail);
+              if (!r.ok) {
+                Toast.show(r.error || 'Could not leave group');
+                return;
+              }
+              navigation.navigate('BottomBar');
+            } catch (e) {
+              Toast.show('Something went wrong');
+            } finally {
+              setLeaveBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const confirmMakeAdmin = member => {
+    if (!member?.peerId || !messageuid) {
+      return;
+    }
+    const cleanName =
+      member.title
+        ?.replace(/\s*\(admin\)\s*/i, '')
+        .replace(/\s*\(you\)\s*/i, '')
+        .trim() || 'this member';
+    Alert.alert(
+      'Make group admin',
+      `Make ${cleanName} an admin? You will remain a member but will no longer be the only admin.`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Make admin',
+          onPress: async () => {
+            setTransferBusy(true);
+            try {
+              const r = await transferGroupAdmin(
+                messageuid,
+                myId,
+                member.peerId,
+                userDetail,
+              );
+              if (!r.ok) {
+                Toast.show(r.error || 'Could not transfer admin');
+                return;
+              }
+              Toast.show('Group admin updated');
+              setSelectedMember(null);
+            } catch (e) {
+              Toast.show('Something went wrong');
+            } finally {
+              setTransferBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView
@@ -394,6 +494,33 @@ const ChatInfoScreen = ({navigation, route, theme, userDetail}) => {
           })
         )}
 
+        {kindNorm === 'group' && !roomLoading && isGroupMember(roomVal, myId) ? (
+          <TouchableOpacity
+            disabled={leaveBusy}
+            onPress={confirmLeaveGroup}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 28,
+              paddingVertical: 14,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+              backgroundColor: '#c6282818',
+            }}>
+            <Ionicons name="exit-outline" size={20} color="#c62828" />
+            <Text
+              style={{
+                color: '#c62828',
+                fontWeight: '600',
+                marginLeft: 8,
+                fontSize: 15,
+              }}>
+              {leaveBusy ? 'Leaving…' : 'Leave group'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         <Text
           style={{
             fontSize: 13,
@@ -493,6 +620,16 @@ const ChatInfoScreen = ({navigation, route, theme, userDetail}) => {
                 gap: 12,
                 flexWrap: 'wrap',
               }}>
+              {canMakeAdminSelected ? (
+                <TouchableOpacity
+                  disabled={transferBusy}
+                  onPress={() => confirmMakeAdmin(selectedMember)}
+                  style={{paddingVertical: 10, paddingHorizontal: 8}}>
+                  <Text style={{color: buttonColor, fontWeight: '600'}}>
+                    {transferBusy ? '…' : 'Make group admin'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
               {canRemoveSelected ? (
                 <TouchableOpacity
                   disabled={removeBusy}

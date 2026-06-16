@@ -14,6 +14,8 @@ function djangoUsernameFromFirebaseUid(email, uid) {
   return base.slice(0, 150);
 }
 
+const ENERGY_MATCH_FETCH_TIMEOUT_MS = 8000;
+
 async function parseJsonResponse(res) {
   const text = await res.text();
   if (!text) {
@@ -26,13 +28,35 @@ async function parseJsonResponse(res) {
   }
 }
 
+async function fetchWithTimeout(url, options, timeoutMs = ENERGY_MATCH_FETCH_TIMEOUT_MS) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => {
+    if (controller) {
+      controller.abort();
+    }
+  }, timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller?.signal,
+    });
+  } catch (e) {
+    if (controller?.signal?.aborted) {
+      throw new Error('Energy Match server unreachable (timeout)');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * @returns {Promise<{ ok: boolean, error?: string }>}
  */
 export async function linkEnergyMatchAfterFirebaseLogin(email, password) {
   const url = `${ENERGY_MATCH_BASE_URL}/api/auth/login/`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -79,7 +103,7 @@ export async function linkEnergyMatchAfterFirebaseRegister({
     password_confirm: pw,
   };
   try {
-    let res = await fetch(signupUrl, {
+    let res = await fetchWithTimeout(signupUrl, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(body),

@@ -2,11 +2,11 @@ import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
-  Dimensions,
   TouchableOpacity,
   FlatList,
   Image,
   ActivityIndicator,
+  Platform,
   SafeAreaView,
   StatusBar,
   TextInput,
@@ -24,9 +24,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import Fontisto from 'react-native-vector-icons/Fontisto';
 import Entypo from 'react-native-vector-icons/Entypo';
 import {signal} from '@preact/signals-react';
-import {TextInput as Input} from 'react-native-paper';
-
-const screenHeight = Dimensions.get('window').height;
+import Button from '../../Components/Button';
 
 const CreateGroup = ({
   navigation,
@@ -34,9 +32,9 @@ const CreateGroup = ({
   theme,
   getUserAction,
   userSearched,
+  searchLoading,
 }) => {
   const [state, setState] = useState({
-    loading: false,
     loadingCreate: false,
     allEmployee: [],
     participents: [],
@@ -45,15 +43,8 @@ const CreateGroup = ({
     groupName: '',
   });
 
-  const {
-    loading,
-    searchText,
-    allEmployee,
-    List,
-    participents,
-    groupName,
-    loadingCreate,
-  } = state;
+  const {searchText, allEmployee, List, participents, groupName, loadingCreate} =
+    state;
 
   const {images} = useImages();
   const styles = getStyles(theme);
@@ -64,16 +55,23 @@ const CreateGroup = ({
     setState(pre => ({...pre, [key]: value}));
   };
 
-  const getAllUsers = () => {
-    handleChange('loading', true);
-    handleChange('allEmployee', users.value);
-    handleChange('List', users.value);
-    handleChange('loading', false);
-  };
+  useEffect(() => {
+    getUserAction('');
+  }, [isFocused, getUserAction]);
+
+  useEffect(() => {
+    users.value = userSearched;
+    setState(pre => ({
+      ...pre,
+      allEmployee: userSearched,
+      List: userSearched,
+    }));
+  }, [userSearched, users]);
 
   const sortByUser = data => {
     return data?.filter(item => item?.id !== userDetail?.id);
   };
+
   const filtered = (key, value) => {
     handleChange(key, value);
     if (value) {
@@ -92,13 +90,26 @@ const CreateGroup = ({
     }
   };
 
-  const getParticipentsIDs = () => {
-    const lists = [];
-    for (let i = 0; i < participents.length; i++) {
-      const element = participents[i];
-      lists.push(element?.id);
+  const toggleParticipant = item => {
+    if (participents?.some(e => e?.id === item?.id)) {
+      handleChange(
+        'participents',
+        participents.filter(e => e?.id !== item?.id),
+      );
+    } else {
+      handleChange('participents', [...participents, item]);
     }
-    return lists;
+  };
+
+  const removeParticipant = itemId => {
+    handleChange(
+      'participents',
+      participents.filter(e => e?.id !== itemId),
+    );
+  };
+
+  const getParticipentsIDs = () => {
+    return participents.map(element => element?.id).filter(Boolean);
   };
 
   const createMessageList = () => {
@@ -117,10 +128,9 @@ const CreateGroup = ({
     }
     handleChange('loadingCreate', true);
     const uid = database().ref(RTDB_MESSAGES_PATH).push().key;
-    const groupMemberIds = [
-      userDetail?.id,
-      ...getParticipentsIDs(),
-    ].filter(Boolean);
+    const groupMemberIds = [userDetail?.id, ...getParticipentsIDs()].filter(
+      Boolean,
+    );
     const memberIds = Object.fromEntries(
       groupMemberIds.map(id => [String(id), true]),
     );
@@ -172,9 +182,95 @@ const CreateGroup = ({
       });
   };
 
-  const renderSearchInput = () => {
+  const backgroundColor = useThemeColor('primary');
+  const textColor = useThemeColor('text');
+  const headerBackgroundColor = useThemeColor('headerColor');
+  const headerTextColor = useThemeColor('headerText');
+  const borderColor = useThemeColor('border');
+  const buttonColor = useThemeColor('buttonColor');
+  const placeholderColor = useThemeColor('placeholder');
+  const searchBar = useThemeColor('inputBackground');
+  const androidStatusBarInset =
+    Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
+
+  const nameTrim = String(groupName || '').trim();
+  const canCreate = !!nameTrim && participents.length > 0 && !loadingCreate;
+  const sortedList = sortByUser(List) || [];
+
+  const renderSelectedChip = ({item}) => (
+    <View style={styles.selectedChip}>
+      <TouchableOpacity
+        onPress={() => removeParticipant(item?.id)}
+        style={styles.selectedChipRemove}>
+        <Entypo name="cross" color="red" size={14} />
+      </TouchableOpacity>
+      <Image
+        source={
+          item?.profile_image && typeof item?.profile_image === 'string'
+            ? {uri: item.profile_image}
+            : images.profile
+        }
+        style={styles.selectedChipAvatar}
+      />
+      <Text style={styles.selectedChipName} numberOfLines={1}>
+        {item?.name}
+      </Text>
+    </View>
+  );
+
+  const renderMemberRow = ({item}) => {
+    const selected = participents?.some(e => e?.id === item?.id);
     return (
-      <>
+      <TouchableOpacity
+        style={styles.memberRow}
+        activeOpacity={0.7}
+        onPress={() => toggleParticipant(item)}>
+        <View style={styles.memberRowLeft}>
+          <Image
+            source={
+              item?.profile_image && typeof item?.profile_image === 'string'
+                ? {uri: item.profile_image}
+                : images.profile
+            }
+            style={styles.memberAvatar}
+          />
+          <Text style={styles.memberName} numberOfLines={1}>
+            {item?.name}
+          </Text>
+        </View>
+        <Fontisto
+          color={textColor}
+          size={22}
+          name={selected ? 'checkbox-active' : 'checkbox-passive'}
+        />
+      </TouchableOpacity>
+    );
+  };
+
+  const listHeader = () => (
+    <View style={styles.listHeaderBlock}>
+      <Text style={styles.helperTextLeft}>
+        Select people below. You can add as many members as you want.
+      </Text>
+      <Text style={styles.sectionTitle}>Suggested</Text>
+      {searchLoading ? <ActivityIndicator size="small" color={textColor} /> : null}
+    </View>
+  );
+
+  return (
+    <SafeAreaView
+      style={[
+        styles.container,
+        {backgroundColor},
+        androidStatusBarInset > 0 && {paddingTop: androidStatusBarInset},
+      ]}>
+      <StatusBar
+        animated
+        backgroundColor={headerBackgroundColor}
+        barStyle="light-content"
+      />
+
+      <View style={styles.childContainerStyle}>
         <View
           style={[
             styles.header,
@@ -182,10 +278,9 @@ const CreateGroup = ({
           ]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={{justifyContent: 'center', height: 45}}>
-            <Ionicons size={25} color={headerTextColor} name={'arrow-back'} />
+            style={styles.backButtonHit}>
+            <Ionicons size={25} color={headerTextColor} name="arrow-back" />
           </TouchableOpacity>
-
           <TextInput
             placeholderTextColor={placeholderColor}
             placeholder="Search users"
@@ -197,214 +292,64 @@ const CreateGroup = ({
             onChangeText={value => filtered('searchText', value)}
           />
         </View>
-        <View
-          style={{
-            marginTop: 10,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
-          <Input
-            label="Group Name"
+
+        <View style={styles.groupNameSection}>
+          <Text style={styles.groupNameLabel}>Group name</Text>
+          <TextInput
+            placeholderTextColor={placeholderColor}
+            placeholder="e.g. Family, Work team"
+            style={styles.groupNameInput}
             value={groupName}
             onChangeText={value => handleChange('groupName', value)}
-            textColor={textColor}
-            style={[styles.searchContainer, {backgroundColor: 'transparent',height:60,bottom:5}]}
-            activeUnderlineColor={textColor}
-            underlineColor={textColor}
           />
-          <Text
-            style={{
-              marginTop: 8,
-              marginHorizontal: 12,
-              fontSize: 13,
-              opacity: 0.75,
-              color: textColor,
-              textAlign: 'center',
-            }}>
-            Select people below. You can add as many members as you want.
-          </Text>
         </View>
-      </>
-    );
-  };
 
-  useEffect(() => {
-    getUserAction('');
-  }, [isFocused]);
+        {participents.length > 0 ? (
+          <FlatList
+            data={participents}
+            horizontal
+            keyExtractor={item => String(item?.id)}
+            style={styles.selectedChipsRow}
+            showsHorizontalScrollIndicator={false}
+            renderItem={renderSelectedChip}
+          />
+        ) : null}
 
-  useEffect(() => {
-    users.value = userSearched;
-    getAllUsers();
-  }, [userSearched]);
-
-  const backgroundColor = useThemeColor('primary');
-  const textColor = useThemeColor('text');
-  const textSecondary = useThemeColor('textSecondary');
-  const headerBackgroundColor = useThemeColor('headerColor');
-  const headerTextColor = useThemeColor('headerText');
-  const borderColor = useThemeColor('border');
-  const buttonColor = useThemeColor('buttonColor');
-  const placeholderColor = useThemeColor('placeholder');
-  const searchBar = useThemeColor('inputBackground');
-
-  const renderContent = () => {
-    return (
-      <View style={styles.childContainerStyle}>
-        {renderSearchInput()}
         <FlatList
-          data={participents}
-          horizontal
-          style={{width: '100%', paddingLeft: '5%'}}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({item, index}) => (
-            <View
-              key={index}
-              style={{marginTop: 10, alignItems: 'center', marginRight: 10}}>
-              <TouchableOpacity
-                onPress={() => {
-                  const removed = participents?.filter(e => e?.id !== item?.id);
-                  handleChange('participents', removed);
-                }}
-                style={{
-                  width: 20,
-                  height: 20,
-                  marginRight: -30,
-                  marginBottom: -10,
-                  zIndex: 33,
-                  borderRadius: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: borderColor,
-                }}>
-                <Entypo name="cross" color="red" size={14} />
-              </TouchableOpacity>
-              <Image
-                source={
-                  (item?.profile_image && typeof item?.profile_image === 'string')
-                    ? {uri: item?.profile_image}
-                    : images.profile
-                }
-                style={{
-                  borderRadius: 5,
-                  width: 40,
-                  height: 40,
-                }}
-              />
-              <Text
-                style={{
-                  textAlign: 'center',
-                  width: 60,
-                  marginTop: 5,
-                }}>
-                {item?.name}
-              </Text>
-            </View>
-          )}
-        />
-        <View
-          style={{
-            width: '90%',
-            alignItems: 'flex-end',
-            justifyContent: 'flex-end',
-            flexDirection: 'row',
-            marginTop: 8,
-          }}>
-          {loadingCreate && (
-            <ActivityIndicator size="small" style={{marginRight: 10}} />
-          )}
-          <TouchableOpacity
-            disabled={
-              !String(groupName || '').trim() ||
-              !participents?.length ||
-              loadingCreate
-            }
-            onPress={createMessageList}>
-            <Text
-              style={{
-                color: textColor,
-                opacity:
-                  String(groupName || '').trim() && participents?.length
-                    ? 1
-                    : 0.45,
-              }}>
-              Create group
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <View style={{width: '90%', marginTop: 10}}></View>
-        <Text style={{marginTop: 10, marginHorizontal: 10}}>Suggested</Text>
-        {loading && <ActivityIndicator size="small" />}
-        <FlatList
-          data={sortByUser(List)}
+          data={sortedList}
+          keyExtractor={item => String(item?.id)}
+          style={styles.listFlex}
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          style={{width: '90%', marginTop: 20, height: screenHeight - 280}}
-          renderItem={({item, index}) => (
-            <View
-              key={index}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 20,
-                borderBottomWidth: 1,
-                paddingBottom: 10,
-                borderBottomColor: textColor,
-                marginHorizontal: 10,
-              }}>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Image
-                  source={
-                    (item?.profile_image && typeof item?.profile_image === 'string')
-                      ? {uri: item?.profile_image}
-                      : images.profile
-                  }
-                  style={{
-                    borderRadius: 5,
-                    width: 50,
-                    height: 50,
-                    marginRight: 20,
-                  }}
-                />
-                <Text style={{}}>{item?.name}</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  if (participents?.some(e => e?.id === item?.id)) {
-                    const removed = participents?.filter(
-                      e => e?.id !== item?.id,
-                    );
-                    handleChange('participents', removed);
-                  } else {
-                    handleChange('participents', [...participents, item]);
-                  }
-                }}>
-                <Fontisto
-                  color={textColor}
-                  size={20}
-                  name={
-                    participents?.some(e => e?.id === item?.id)
-                      ? 'checkbox-active'
-                      : 'checkbox-passive'
-                  }
-                />
-              </TouchableOpacity>
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            <View style={styles.emptyList}>
+              <Text style={styles.emptyListText}>No users found</Text>
             </View>
-          )}
+          }
+          renderItem={renderMemberRow}
         />
+
+        <View style={styles.bottomBar}>
+          {participents.length > 0 ? (
+            <Text style={styles.selectionCount}>
+              {participents.length === 1
+                ? '1 member selected'
+                : `${participents.length} members selected`}
+            </Text>
+          ) : null}
+          <Button
+            text="Create group"
+            onPress={createMessageList}
+            loading={loadingCreate}
+            disabled={!canCreate}
+            containerStyle={[
+              {backgroundColor: buttonColor},
+              !canCreate && styles.buttonDisabledOpacity,
+            ]}
+          />
+        </View>
       </View>
-    );
-  };
-
-  return (
-    <SafeAreaView
-      style={[styles.container, {backgroundColor: backgroundColor}]}>
-      <StatusBar
-        animated={true}
-        backgroundColor={headerBackgroundColor}
-        barStyle={'light-content'}
-      />
-
-      {renderContent()}
     </SafeAreaView>
   );
 };
@@ -412,47 +357,12 @@ const CreateGroup = ({
 const mapStateToProps = state => ({
   theme: state?.themes?.theme,
   userSearched: state?.searchUser?.profile,
-  loading: state?.searchUser?.requesting,
+  searchLoading: state?.searchUser?.requesting,
   userDetail: state?.login?.userDetail?.user,
 });
 
 const mapDispatchToProps = dispatch => ({
   getUserAction: data => dispatch(getUserAction(data)),
 });
-export default connect(mapStateToProps, mapDispatchToProps)(CreateGroup);
 
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: 'green',
-//   },
-//   title: {
-//     color: 'white',
-//     textAlign: 'center',
-//     marginVertical: 10,
-//   },
-//   sliderContainer: {
-//     flexDirection: 'row',
-//     width: screenWidth,
-//     justifyContent: 'space-around',
-//     alignItems: 'center',
-//     // backgroundColor: Colors.BUTTON_BG,
-//   },
-//   touchable: {
-//     // borderBottomColor: Colors.WHITE,
-//     borderBottomWidth: 2,
-//     paddingHorizontal: 30,
-//   },
-//   childContainerStyle: {
-//     paddingVertical: 20,
-//     alignItems: 'center',
-//   },
-//   animatedViewStyle: {
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//     width: screenWidth * 2,
-//     flex: 1,
-//     marginTop: 2,
-//     marginLeft: 0,
-//   },
-// });
+export default connect(mapStateToProps, mapDispatchToProps)(CreateGroup);
