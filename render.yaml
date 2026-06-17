@@ -1,4 +1,5 @@
-# Render Blueprint — see repo root render.yaml (canonical copy for Blueprint discovery).
+# Render Blueprint — must live at repository root.
+# Dashboard: New + → Blueprint → select this repo → Apply
 
 databases:
   - name: energy-match-db

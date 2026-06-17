@@ -16,10 +16,20 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
     raise ValueError('DJANGO_SECRET_KEY environment variable is required in production')
 
-_allowed = os.environ.get('ALLOWED_HOSTS', '')
-ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()]
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get('ALLOWED_HOSTS', '').split(',')
+    if h.strip()
+]
+
+_render_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_host)
+
 if not ALLOWED_HOSTS:
-    raise ValueError('ALLOWED_HOSTS environment variable is required in production')
+    raise ValueError(
+        'Set ALLOWED_HOSTS or deploy on Render (RENDER_EXTERNAL_HOSTNAME is set automatically)',
+    )
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
