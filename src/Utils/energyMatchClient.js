@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ENERGY_MATCH_BASE_URL,
+  ENERGY_MATCH_PROD_BASE_URL,
   ENERGY_MATCH_TOKEN_KEY,
+  isEnergyMatchConfigured,
 } from '../Config/energyMatch';
 
 export async function getEnergyMatchToken() {
@@ -43,6 +45,16 @@ export async function setEnergyMatchToken(token) {
  * @returns {Promise<{ ok: boolean, status: number, data: any, error: string | null }>}
  */
 export async function energyMatchRequest(path, options = {}) {
+  if (!isEnergyMatchConfigured()) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      error:
+        'Energy Match API URL not set for release. Add ENERGY_MATCH_PROD_BASE_URL in src/Config/energyMatch.local.js (see energyMatch.local.example.js), rebuild the APK, and deploy energy_match_project.',
+    };
+  }
+
   const token = await getEnergyMatchToken();
   if (!token) {
     if (__DEV__) {
@@ -85,7 +97,9 @@ export async function energyMatchRequest(path, options = {}) {
     const hint =
       __DEV__ && msg === 'Network request failed'
         ? `${msg} — Is Django running? Try: cd energy_match_project && python manage.py runserver 0.0.0.0:8000. Base URL: ${ENERGY_MATCH_BASE_URL}. Physical device: set ENERGY_MATCH_DEV_HOST_OVERRIDE in src/Config/energyMatch.js to your PC LAN IP.`
-        : msg;
+        : !__DEV__ && msg === 'Network request failed'
+          ? `${msg} — Check ENERGY_MATCH_PROD_BASE_URL (${ENERGY_MATCH_PROD_BASE_URL || 'not set'}) and that the Django API is deployed and reachable.`
+          : msg;
     return {
       ok: false,
       status: 0,

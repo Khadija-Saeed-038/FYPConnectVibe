@@ -1,7 +1,7 @@
 /**
  * Link Django Energy Match (DRF token) after Firebase email/password auth (plan option A).
  */
-import {ENERGY_MATCH_BASE_URL} from '../Config/energyMatch';
+import {ENERGY_MATCH_BASE_URL, isEnergyMatchConfigured} from '../Config/energyMatch';
 import {setEnergyMatchToken} from './energyMatchClient';
 
 function djangoUsernameFromFirebaseUid(email, uid) {
@@ -54,6 +54,12 @@ async function fetchWithTimeout(url, options, timeoutMs = ENERGY_MATCH_FETCH_TIM
  * @returns {Promise<{ ok: boolean, error?: string }>}
  */
 export async function linkEnergyMatchAfterFirebaseLogin(email, password) {
+  if (!isEnergyMatchConfigured()) {
+    return {
+      ok: false,
+      error: 'ENERGY_MATCH_API_NOT_CONFIGURED',
+    };
+  }
   const url = `${ENERGY_MATCH_BASE_URL}/api/auth/login/`;
   try {
     const res = await fetchWithTimeout(url, {
@@ -92,6 +98,12 @@ export async function linkEnergyMatchAfterFirebaseRegister({
   password,
   firebaseUid,
 }) {
+  if (!isEnergyMatchConfigured()) {
+    return {
+      ok: false,
+      error: 'ENERGY_MATCH_API_NOT_CONFIGURED',
+    };
+  }
   const em = String(email || '').trim();
   const pw = String(password || '');
   const username = djangoUsernameFromFirebaseUid(em, firebaseUid);

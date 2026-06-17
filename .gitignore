@@ -37,6 +37,10 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+# Energy Match release URL (per-machine / per-deploy)
+src/Config/energyMatch.local.js
+energy_match_project/.env
+
 # BUCK
 buck-out/
 \.buckd/
