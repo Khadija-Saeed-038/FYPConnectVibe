@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path, re_path
 from django.views.generic import RedirectView
 from drf_spectacular.views import (
@@ -21,6 +22,8 @@ class LoginView(ObtainAuthToken):
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+
+    path("api/health/", lambda request: JsonResponse({"status": "ok"}), name="health"),
 
     path("api/auth/signup/", SignupView.as_view(), name="signup"),
     path("api/auth/login/", LoginView.as_view(), name="login"),

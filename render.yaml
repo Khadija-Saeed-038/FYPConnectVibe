@@ -1,0 +1,25 @@
+# Render Blueprint — must live at repository root.
+# Dashboard: New + → Blueprint → select this repo → Apply
+
+databases:
+  - name: energy-match-db
+    plan: free
+
+services:
+  - type: web
+    name: connectvibe-energy-match
+    runtime: python
+    plan: free
+    rootDir: energy_match_project
+    healthCheckPath: /api/health/
+    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.production
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: energy-match-db
+          property: connectionString
